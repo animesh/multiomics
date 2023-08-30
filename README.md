@@ -63,7 +63,7 @@ The event will start on Sunday evening and end on Friday around lunch time.
 ## Course material
 
 ### Pre course install
-Lists of packages that will be used and need to be installed before the course can be found [here](https://github.com/flomehl/summer-school-multiomics-data-analysis-and-integration/blob/master/general/precourse.md)  
+Lists of packages that will be used and need to be installed before the course can be found [here](https://github.com/sib-swiss/summer-school-multiomics-data-analysis-and-integration/tree/master/general/precourse.md)  
 
 ### datasets
-The datasets that will be used to train during the course and the publications with their descriptions can be found [here](https://github.com/flomehl/summer-school-multiomics-data-analysis-and-integration/tree/master/general/datasets)  
+The datasets that will be used to train during the course and the publications with their descriptions can be found [here](https://github.com/sib-swiss/summer-school-multiomics-data-analysis-and-integration/tree/master/general/datasets)  
