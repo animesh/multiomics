@@ -1,7 +1,7 @@
 # Packages to install before the session
 
-R >= 4 with Rstudio or another IDE
-data.table
+R >= 4 with Rstudio or another IDE  
+data.table  
 DT  
 
 ## Topic 1  
