@@ -1,16 +1,16 @@
 # Packages to install before the session
 
 R >= 4 with Rstudio or another IDE
+data.table
+DT  
 
 ## Topic 1  
 
-### MOFA
-data.table  
+### MOFA  
 ggplot2  
 gage  
 MOFA2  
 MOFAdata  
-DT  
 msigdbr  
 
 ### RGCCA
@@ -28,6 +28,19 @@ Cytoscape (https://cytoscape.org/download.html, version >= 3.7) with these appli
 	- LegendCreator
 
 ## Topic 3
+tidyverse  
+TCGAbiolinks (facultatif + via Bioconductor)  
+SummarizedExperiment (facultatif + via Bioconductor)  
+clusterProfiler (via Bioconductor)  
+enrichR  
+DOSE (via Bioconductor)  
+AnnotationHub (via Bioconductor)  
+neo4r  
+tidytext  
+GO.db (via Bioconductor)  
+GOxploreR  
+annotate  
+visNetwork  
 dplyr  
 tidyr  
 readr  
