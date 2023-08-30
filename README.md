@@ -3,12 +3,12 @@
 ## Overview
 Researchers often have access to or generate multiple omics data (RNAseq, metabolomics, lipidomics, proteomics…) within a single study. Although each omics data is usually analyzed individually, combining complementary data can yield a better understanding of the mechanisms involved in biological processes. Several integrative approaches are now available to combine such data, coming essentially from two families of methods, namely multivariate statistical analyses and network-based approaches. During this summer school both methodologies will be covered, introducing RGCCA and mixOmics for multivariate analyses and WGCNA and SNF for network-based strategies. To get meaningful biological information, the interpretation of statistical results needs to be done contextualizing them in the available biological knowledge. To address this major step we need to be able to access and interrogate databases. We will harness this subject introducing semantic web and knowledge graphs in the context of metabolic networks.
 
-During the School, significant time will be devoted to hands-on and the program will be divided into three phases / topics:
-
-Multivariate statistical analyses (Instructors: Arnaud Gloaguen & Jimmy Vandel)
-Network-based approaches (Instructors: Morgane Térézol & Marie-Galadriel Brière)
-Results contextualisation: an introduction to metabolic models, web semantic and knowledge graphs (Instructors: Jean-Clément Gallardo, Maxime Delmas & Marco Pagni)
-The participants will work in groups and shortly present the application of what they have learned to their own project.
+During the School, significant time will be devoted to hands-on and the program will be divided into three phases / topics:  
+  
+Multivariate statistical analyses (Instructors: Arnaud Gloaguen & Jimmy Vandel)  
+Network-based approaches (Instructors: Morgane Térézol & Marie-Galadriel Brière)  
+Results contextualisation: an introduction to metabolic models, web semantic and knowledge graphs (Instructors: Jean-Clément Gallardo, Maxime Delmas & Marco Pagni)  
+The participants will work in groups and shortly present the application of what they have learned to their own project.  
 
 
 ## Audience
