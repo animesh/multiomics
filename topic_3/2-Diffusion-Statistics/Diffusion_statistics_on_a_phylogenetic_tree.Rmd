@@ -1,0 +1,342 @@
+---
+title: "Diffusion statistics on a phylogenetic tree"
+author: "Marco Pagni"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set( 
+    echo    = TRUE,
+    message = FALSE, 
+    warning = FALSE
+)
+```
+
+## R initialisation
+
+Initialize the R environment and define two directory paths - you may need to update those for your system!
+
+```{r init, }
+
+library( dplyr )
+library( tidyr )
+library( readr )
+library( igraph )
+library( diffuStats )
+library( visNetwork )
+library( kableExtra )
+
+# FIXME: update the following two variables to match your system
+script_path = '~/github/summer-school-multiomics-data-analysis-and-integration/topic_3/2-Diffusion-Statistics/' 
+data_path   = '~/github/summer-school-multiomics-data-analysis-and-integration/topic_2/datasets/TaraOceans/'
+
+setwd( script_path )
+
+```
+
+## Load (and fix) the TARA oceans datasets
+
+`TARAoceans_metadata` contains three columns with string codes for sample, ocean and depth.
+
+```{r load_datasets}
+
+TARAoceans_metadata <- 
+    read_csv(
+        paste0( data_path, 'TARAoceans_metadata.csv' ), 
+        show_col_types = F 
+    ) %>% 
+    rename( sample = 1 )
+
+TARAoceans_metadata %>%
+    slice_head( n = 5 ) %>%
+    kable() %>%
+    kable_minimal()
+
+```
+`TARAoceans_specfreq` contains a table with the raw read counts for the different "species" in the different samples. Nota Bene: 
+(i) we use the wording "species" here for what should be called Operational Taxonomic Unit (OTU) 
+(ii) the source file name contains the wording "Phylo" which would make more sense for the next file. 
+
+```{r}
+
+TARAoceans_specfreq <-
+    read_csv( 
+        paste0( data_path, 'TARAoceans_proPhylo.csv' ), 
+        show_col_types = F
+    ) %>% 
+    rename( sample = 1 )
+
+TARAoceans_specfreq %>%
+    slice_head( n = 5 ) %>%
+    select( 1:6 ) %>%
+    kable() %>%
+    kable_minimal()
+
+```
+`TARAoceans_lineage` contains a table with the lineage of every "species". Some lineages were corrected with respect to `NA`, `uncultured`, `Family Incertae Sedis`, ... taxa. Indeed, these correspond to different entities despite a shared designation and must be distinguished by introducing placeholder taxa. This also permit to preserve branch lengths in the final phylogenetic tree. It might be difficult to detect such shared designation in large dataset. Graphical visualisation might help. The `cleanup_uppertaxon` is totally adhoc, but fix the problem.
+
+
+```{r}
+
+cleanup_uppertaxon <- function( species, uppertaxon, rank ){
+    return(
+        ifelse( 
+            is.na( uppertaxon ) | ( uppertaxon  %in% c(
+                'uncultured',
+                'Family Incertae Sedis',
+                'Family XII Incertae Sedis',
+                'FamilyI',
+                'Incertae Sedis',
+                'Order Incertae Sedis',
+                'Marinicella',
+                'Prochlorococcus'
+            )), 
+            paste0( rank, '_of_', species ),
+            paste0( uppertaxon, '_', rank )
+        )
+    );
+}
+
+TARAoceans_lineage <-
+    read_csv( 
+        paste0( data_path, 'TARAoceans_taxonomy.csv' ), 
+        show_col_types = F
+    ) %>%
+    rename( species = 1 ) %>%
+    mutate(
+        domain = cleanup_uppertaxon( species, Domain, 'domain' ),
+        phylum = cleanup_uppertaxon( species, Phylum, 'phylum' ),
+        class  = cleanup_uppertaxon( species, Class,  'class'  ),
+        order  = cleanup_uppertaxon( species, Order,  'order'  ),
+        family = cleanup_uppertaxon( species, Family, 'family' ),
+        genus  = cleanup_uppertaxon( species, Genus,  'genus'  )
+    ) %>%
+    select( species, genus, family, order, class, phylum, domain )
+```
+
+`TARAoceans_lineage` contains a table with the lineage of every "species". Some lineages were corrected with respect to `NA` and `uncultured` taxa. Indeed, these correspond to different entities despite a shared designation and must be distinguished by introducing placeholder taxa. This also permit to preserve branch lengths in the final phylogenetic tree. 
+
+```{r}
+
+TARAoceans_lineage %>%
+    slice_head( n = 5 ) %>%
+    select( 1:4 ) %>%
+    kable() %>%
+    kable_minimal()
+
+```
+
+## Prepare the phylogeny graph
+
+We are going to use both `visNetwork` and `igraph` to handle graphs. Both package can be fed with a tibble describing vertices (AKA nodes) and another tibble describing edges. The same tibbles can be used for both packages provided the first column of the vertices is named `id` and the two first columns for edges are named `from` and `to`. First stats with edges:
+
+```{r}
+
+e_phylogeny <- bind_rows(
+    TARAoceans_lineage %>% select( from = species, to = genus ),
+    TARAoceans_lineage %>% select( from = genus,   to = family ),
+    TARAoceans_lineage %>% select( from = family,  to = order ),
+    TARAoceans_lineage %>% select( from = order,   to = class ),
+    TARAoceans_lineage %>% select( from = class,   to = phylum ),
+    TARAoceans_lineage %>% select( from = phylum,  to = domain )
+) %>% distinct()
+
+e_phylogeny %>%
+    slice_head( n = 5 ) %>%
+    kable() %>%
+    kable_minimal()
+
+```
+ 
+Nota Bene: The following statement permitted to detect the problematic taxa, e.g. `uncultured` and to write the exception list in `cleanup_uppertaxon()`
+
+```{r eval = FALSE }
+
+e_phylogeny %>% count( from ) %>% filter( n > 1 )
+
+```
+
+Secondly let's build the vertex tibbles. For practical reason, we are separating 
+the "species" taxa from all the upper taxa:
+
+```{r}
+
+v_species <- TARAoceans_lineage %>% 
+    select( id = species ) %>%
+    mutate(
+        color = 'darkgreen',
+        label = id,
+        size  = 28
+    ) %>%
+    distinct()
+
+v_uppertaxon <- bind_rows(
+        TARAoceans_lineage %>% select( id = genus )  %>% mutate( size  = 24 ),
+        TARAoceans_lineage %>% select( id = family ) %>% mutate( size  = 20  ),
+        TARAoceans_lineage %>% select( id = order )  %>% mutate( size  = 16 ),
+        TARAoceans_lineage %>% select( id = class )  %>% mutate( size  = 12  ),
+        TARAoceans_lineage %>% select( id = phylum ) %>% mutate( size  = 8  ),
+        TARAoceans_lineage %>% select( id = domain ) %>% mutate( size  = 4  ) 
+    ) %>%
+    distinct() %>%
+    mutate(
+        color = 'lightgreen',
+        label = id
+    )
+
+v_phylogeny <- bind_rows( v_species , v_uppertaxon )
+
+v_phylogeny %>%
+    slice_head( n = 5 ) %>%
+    kable() %>%
+    kable_minimal()
+
+```
+
+Build the phylogeny in an `igraph` object and count the number of connected component.
+
+
+```{r}
+igraph_phylogeny <- graph_from_data_frame(
+    e_phylogeny, 
+    vertices = v_phylogeny
+)
+count_components( igraph_phylogeny )
+
+```
+Aha! There are two phylogenetic trees here: one for bacteria and another one for Archea. 
+
+The Phylogeny can be visualized using `igraph`. This is very fast, but cumbersome to parametrize. By default the two trees are not properly separated:
+
+```{r}
+
+plot( 
+    igraph_phylogeny, 
+    layout=layout_as_tree, 
+    vertex.label=NA, 
+    vertex.size=v_phylogeny$size/10, # the size were setup for visNetwork
+    edge.length = 1,
+    edge.arrow.mode = '-'
+)
+
+```
+But `igraph` has many tools to handle graphs:
+
+```{r}
+
+```
+
+
+
+The Phylogeny also be visualized using `visNetwork`, directly from the tibbles. The simulation takes a while to stabilise. The labels become visible after zooming enough.
+
+```{r}
+
+visNetwork( 
+        edges = e_phylogeny, 
+        nodes = v_phylogeny
+    ) %>%
+    visPhysics( stabilization = FALSE ) %>% 
+    visEdges(smooth = FALSE)
+
+```
+
+## "Temperatures"
+
+The idea is calculate some kind of correlation between sampling depth and "species" distribution, to latter diffuse these values on the phylogeny graph.
+
+First, let encode numerically the depth codes. The code below was inspired by Fig X of , with the depth expressed on a log-like scale from 0 (surface ) to 5. It would obviously been better to have access to the real depth measurments.
+
+```{r}
+
+depth_code      <- setNames( c( 0, 2, 3, 5 ), c( 'SRF', 'MIX', 'DCM', 'MES' ))
+depth           <- setNames(
+    unlist( depth_code[ TARAoceans_metadata$depth ] ),
+    unlist( TARAoceans_metadata$sample )
+)
+hist( depth  )
+```
+
+The raw read counts are nomalized on a log scale after adding a one pseudocount. The correlations with depth is computed for each "species". This measue: 
+
+```{r}
+
+species_score <- log10( 1 + as.matrix( TARAoceans_specfreq[ , -1 ] ))
+rownames( species_score ) <- unlist( TARAoceans_specfreq[ , 1 ] )
+cor_species_depth <- setNames(
+    as.vector( t( cor( depth, species_score ))),
+    colnames( species_score )
+)
+hist( cor_species_depth  )
+
+```
+
+## Diffuse
+
+The `igraph` package expect the graph as an `igraph` object, that we have already have produced. It can be converted on-the-fly into an undircected graph. The method `regularisedLaplacianKernel` return a (possibly huge) matrix that might takes some times to co pute, although it is not the case here with our graph of about 10,000 vertices. The function  `diffuse` with method `z`is extremely fast (`mc` would be much slower). 
+ 
+```{r}
+
+#igraph_phylogeny <- graph_from_data_frame(
+#    e_phylogeny, 
+#    vertices = v_phylogeny
+#)
+ker_phylogeny <- regularisedLaplacianKernel( 
+    graph = as.undirected( igraph_phylogeny ),
+    add_diag = 1
+);
+diffuse_phylogeny <- diffuse( 
+    K      = ker_phylogeny,
+    scores = cor_species_depth,
+    method = "z"
+)
+
+```
+
+Print the twenty most enriched nodes based on the absolute value of the z-score. Note that most of them are upper taxa, not "species", including a few placeholders. ;-))
+
+```{r}
+
+tibble( 
+    id = names( diffuse_phylogeny ), 
+    z_score = diffuse_phylogeny 
+) %>% 
+    arrange( desc( abs( z_score ))) %>%
+    slice_head( n = 20 ) %>%
+    kable() %>%
+    kable_minimal()
+
+```
+
+Show the full graph colored by Z-score. The vertex with a border are those given a fixed temperature. It takes a while for the graph to stabilize. Thereafter one can identify blue and clades that correspond to taxonomic groups which abundance is correlated with depth positively or neagtively, respectively .
+
+```{r}
+
+# A helper function to map -csoe to color
+ramp_for_z <- colorRamp( c("red", "white", "blue") )
+col_for_z <- function( z_score, thresh = 2.5 ){
+    return(
+        ifelse( 
+            is.na( z_score ),
+            "white",
+            rgb( 
+                ramp_for_z( 
+                    pmin( pmax(( z_score + 3 * thresh )/( 6 * thresh ), 0 ), 1 )
+                )
+            , maxColorValue = 255 )
+        )
+    )
+}
+w_phylogeny = v_phylogeny # local copy 
+w_phylogeny$color       <- col_for_z( diffuse_phylogeny )
+w_phylogeny$borderWidth <- ifelse( v_phylogeny$id %in% names( cor_species_depth ), 2, 0 )
+visNetwork( 
+        edges = e_phylogeny, 
+        nodes = w_phylogeny
+    ) %>%
+    visPhysics( stabilization = FALSE ) %>% 
+    visEdges(smooth = FALSE)
+
+```
+
