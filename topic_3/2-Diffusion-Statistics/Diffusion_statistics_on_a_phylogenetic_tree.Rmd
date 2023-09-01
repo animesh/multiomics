@@ -257,9 +257,9 @@ visNetwork(
 
 ## "Temperatures"
 
-The idea is calculate some kind of correlation between sampling depth and "species" distribution, to latter diffuse these values on the phylogeny graph.
+The idea is to calculate the correlations between sampling depth and "species" distribution. These correlation values will be used as fixed temperature, defined between -a and 1 for the diffusion algorithm.
 
-First, let encode numerically the depth codes. The code below was inspired by Fig X of , with the depth expressed on a log-like scale from 0 (surface ) to 5. It would obviously been better to have access to the real depth measurments.
+First, let encode numerically the depth codes. The code below was inspired by Fig X of Y, with the depth expressed on a log-like scale from 0 (surface ) to 5. It would be better to use the real depth measures.
 
 ```{r}
 
@@ -269,6 +269,7 @@ depth           <- setNames(
     unlist( TARAoceans_metadata$sample )
 )
 hist( depth  )
+
 ```
 
 The raw read counts are nomalized on a log scale after adding a one pseudocount. The correlations with depth is computed for each "species". This measue: 
@@ -285,16 +286,12 @@ hist( cor_species_depth  )
 
 ```
 
-## Diffuse
+## Diffusion statistics
 
-The `igraph` package expect the graph as an `igraph` object, that we have already have produced. It can be converted on-the-fly into an undircected graph. The method `regularisedLaplacianKernel` return a (possibly huge) matrix that might takes some times to co pute, although it is not the case here with our graph of about 10,000 vertices. The function  `diffuse` with method `z`is extremely fast (`mc` would be much slower). 
+The `diffuStats` package expects the graph as an `igraph` object, that we have already have produced. It must be converted on-the-fly into an undircected graph. The method `regularisedLaplacianKernel` return a (possibly huge) matrix that might takes some times to compute, although it is not the case here with our "small" graph of about 1,000 vertices. The function  `diffuse` with method `z`is extremely fast (`mc` would be much slower). 
  
 ```{r}
 
-#igraph_phylogeny <- graph_from_data_frame(
-#    e_phylogeny, 
-#    vertices = v_phylogeny
-#)
 ker_phylogeny <- regularisedLaplacianKernel( 
     graph = as.undirected( igraph_phylogeny ),
     add_diag = 1
@@ -307,7 +304,7 @@ diffuse_phylogeny <- diffuse(
 
 ```
 
-Print the twenty most enriched nodes based on the absolute value of the z-score. Note that most of them are upper taxa, not "species", including a few placeholders. ;-))
+Print the twenty most enriched nodes based on the absolute value of the Z-score. Note that most of them are upper taxa, not "species" and they include a few placeholder taxa. ;-)
 
 ```{r}
 
@@ -322,7 +319,7 @@ tibble(
 
 ```
 
-Show the full graph colored by Z-score. The vertex with a border are those given a fixed temperature. It takes a while for the graph to stabilize. Thereafter one can identify blue and clades that correspond to taxonomic groups which abundance is correlated with depth positively or neagtively, respectively .
+Show the full graph colored by Z-score. The vertex with a border are those given a fixed temperature. It takes a while for the graph to stabilize. Thereafter one can identify blue and clades that correspond to taxonomic groups which abundances are correlated with depth positively (blue) or neagtively, respectively (red).
 
 ```{r}
 
