@@ -221,9 +221,20 @@ plot(
 )
 
 ```
-But `igraph` has many tools to handle graphs:
+But `igraph` has many tools to manipulate graphs. For example `decompose` creates a separate graph for each component of a graph. Here below are plotted the large bacterial tree and the much smaller archeal one. 
+
 
 ```{r}
+components <- decompose( igraph_phylogeny )
+lapply( 
+    components, 
+    plot,
+        layout=layout_as_tree, 
+        vertex.label=NA, 
+        vertex.size=v_phylogeny$size/10, # the size were setup for visNetwork
+        edge.length = 1,
+        edge.arrow.mode = '-'
+    ) 
 
 ```
 
