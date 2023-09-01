@@ -207,7 +207,7 @@ count_components( igraph_phylogeny )
 ```
 Aha! There are two phylogenetic trees here: one for bacteria and another one for Archea. 
 
-The Phylogeny can be visualized using `igraph`. This is very fast, but cumbersome to parametrize. By default the two trees are not properly separated:
+The Phylogeny can be visualized using `igraph`. This is very fast, but cumbersome to parametrize. This first plot reveal two things: two trees are not properly separated, the tree roots are at the bottom which unusual (would be better placed on the left).
 
 ```{r}
 
@@ -221,20 +221,27 @@ plot(
 )
 
 ```
-But `igraph` has many tools to manipulate graphs. For example `decompose` creates a separate graph for each component of a graph. Here below are plotted the large bacterial tree and the much smaller archeal one. 
+
+By using the `decompose` function of `igraph`, one can separate each graph for each component of a graph. Here below are plotted the large bacterial tree and the much smaller archeal one. 
 
 
 ```{r}
 components <- decompose( igraph_phylogeny )
 lapply( 
     components, 
-    plot,
-        layout=layout_as_tree, 
-        vertex.label=NA, 
-        vertex.size=v_phylogeny$size/10, # the size were setup for visNetwork
-        edge.length = 1,
-        edge.arrow.mode = '-'
-    ) 
+    function( g ){
+        lay = layout_as_tree( g )
+        # plot(m, layout=-lay[, 2:1]) or maybe this is more what you want: lay[, 2] = -lay[,2] ; plot(m, layout=lay[,2:1]) 
+        plot( 
+            g,
+            layout          = lay[, 2:1], 
+            vertex.label    = NA, 
+            vertex.size     = v_phylogeny$size/5, # the size were setup for visNetwork
+            edge.length     = 1,
+            edge.arrow.mode = '-' # no arrow head
+        )
+    }
+)
 
 ```
 
