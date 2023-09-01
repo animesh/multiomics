@@ -51,7 +51,7 @@ TARAoceans_metadata <-
 TARAoceans_metadata %>%
     slice_head( n = 5 ) %>%
     kable() %>%
-    kable_minimal()
+    kable_minimal( full_width = F )
 
 ```
 `TARAoceans_specfreq` contains a table with the raw read counts for the different "species" in the different samples. Nota Bene: 
@@ -71,11 +71,10 @@ TARAoceans_specfreq %>%
     slice_head( n = 5 ) %>%
     select( 1:6 ) %>%
     kable() %>%
-    kable_minimal()
+    kable_minimal( full_width = F )
 
 ```
 `TARAoceans_lineage` contains a table with the lineage of every "species". Some lineages were corrected with respect to `NA`, `uncultured`, `Family Incertae Sedis`, ... taxa. Indeed, these correspond to different entities despite a shared designation and must be distinguished by introducing placeholder taxa. This also permit to preserve branch lengths in the final phylogenetic tree. It might be difficult to detect such shared designation in large dataset. Graphical visualisation might help. The `cleanup_uppertaxon` is totally adhoc, but fix the problem.
-
 
 ```{r}
 
@@ -113,23 +112,18 @@ TARAoceans_lineage <-
         genus  = cleanup_uppertaxon( species, Genus,  'genus'  )
     ) %>%
     select( species, genus, family, order, class, phylum, domain )
-```
-
-`TARAoceans_lineage` contains a table with the lineage of every "species". Some lineages were corrected with respect to `NA` and `uncultured` taxa. Indeed, these correspond to different entities despite a shared designation and must be distinguished by introducing placeholder taxa. This also permit to preserve branch lengths in the final phylogenetic tree. 
-
-```{r}
 
 TARAoceans_lineage %>%
     slice_head( n = 5 ) %>%
     select( 1:4 ) %>%
     kable() %>%
-    kable_minimal()
+    kable_minimal( full_width = F )
 
 ```
 
-## Prepare the phylogeny graph
+## Prepare the phylogeny as a graph
 
-We are going to use both `visNetwork` and `igraph` to handle graphs. Both package can be fed with a tibble describing vertices (AKA nodes) and another tibble describing edges. The same tibbles can be used for both packages provided the first column of the vertices is named `id` and the two first columns for edges are named `from` and `to`. First stats with edges:
+We are going to use both `visNetwork` and `igraph` to handle graphs. Both package can be fed with tibbles describing vertices (AKA nodes) and edges. The same tibbles can be used for both packages provided the first column of the vertices is named `id` and the two first columns for edges are named `from` and `to`. First stats with edges:
 
 ```{r}
 
@@ -145,11 +139,11 @@ e_phylogeny <- bind_rows(
 e_phylogeny %>%
     slice_head( n = 5 ) %>%
     kable() %>%
-    kable_minimal()
+    kable_minimal( full_width = F )
 
 ```
  
-Nota Bene: The following statement permitted to detect the problematic taxa, e.g. `uncultured` and to write the exception list in `cleanup_uppertaxon()`
+Nota Bene: The following statement permitted to detect the problematic taxa, e.g. `uncultured` and to write the exception list in `cleanup_uppertaxon()`. Currently it return an empty tibble.
 
 ```{r eval = FALSE }
 
@@ -167,22 +161,23 @@ v_species <- TARAoceans_lineage %>%
     mutate(
         color = 'darkgreen',
         label = id,
-        size  = 28
+        size  = 25
     ) %>%
     distinct()
 
 v_uppertaxon <- bind_rows(
-        TARAoceans_lineage %>% select( id = genus )  %>% mutate( size  = 24 ),
-        TARAoceans_lineage %>% select( id = family ) %>% mutate( size  = 20  ),
-        TARAoceans_lineage %>% select( id = order )  %>% mutate( size  = 16 ),
-        TARAoceans_lineage %>% select( id = class )  %>% mutate( size  = 12  ),
-        TARAoceans_lineage %>% select( id = phylum ) %>% mutate( size  = 8  ),
-        TARAoceans_lineage %>% select( id = domain ) %>% mutate( size  = 4  ) 
+        TARAoceans_lineage %>% select( id = genus ),
+        TARAoceans_lineage %>% select( id = family ),
+        TARAoceans_lineage %>% select( id = order ),
+        TARAoceans_lineage %>% select( id = class ),
+        TARAoceans_lineage %>% select( id = phylum ),
+        TARAoceans_lineage %>% select( id = domain )
     ) %>%
     distinct() %>%
     mutate(
         color = 'lightgreen',
-        label = id
+        label = id,
+        size  = 25,
     )
 
 v_phylogeny <- bind_rows( v_species , v_uppertaxon )
@@ -190,7 +185,7 @@ v_phylogeny <- bind_rows( v_species , v_uppertaxon )
 v_phylogeny %>%
     slice_head( n = 5 ) %>%
     kable() %>%
-    kable_minimal()
+    kable_minimal( full_width = F )
 
 ```
 
@@ -207,7 +202,7 @@ count_components( igraph_phylogeny )
 ```
 Aha! There are two phylogenetic trees here: one for bacteria and another one for Archea. 
 
-The Phylogeny can be visualized using `igraph`. This is very fast, but cumbersome to parametrize. This first plot reveal two things: two trees are not properly separated, the tree roots are at the bottom which unusual (would be better placed on the left).
+The Phylogeny can be visualized using `igraph`. This is very fast, but less easy to parametrize than `visNetwork`. This plot below reveals two things: the two trees are not properly separated and the tree roots are placed at the bottom, which is unusual. They would be better placed on the left).
 
 ```{r}
 
@@ -222,7 +217,7 @@ plot(
 
 ```
 
-By using the `decompose` function of `igraph`, one can separate each graph for each component of a graph. Here below are plotted the large bacterial tree and the much smaller archeal one. 
+By using the `decompose` function of `igraph`, one can separate each component of a graph. Here below are plotted the large bacterial tree and the much smaller archeal one. 
 
 
 ```{r}
@@ -247,7 +242,7 @@ lapply(
 
 
 
-The Phylogeny also be visualized using `visNetwork`, directly from the tibbles. The simulation takes a while to stabilise. The labels become visible after zooming enough.
+The Phylogeny can also be visualized using `visNetwork`. The simulation takes a while to stabilize, hence for the `stabilization = FALSE` that prevent locking the display. The labels become visible after zooming enough.
 
 ```{r}
 
@@ -256,7 +251,7 @@ visNetwork(
         nodes = v_phylogeny
     ) %>%
     visPhysics( stabilization = FALSE ) %>% 
-    visEdges(smooth = FALSE)
+    visEdges( smooth = FALSE)
 
 ```
 
@@ -323,7 +318,7 @@ tibble(
     arrange( desc( abs( z_score ))) %>%
     slice_head( n = 20 ) %>%
     kable() %>%
-    kable_minimal()
+    kable_minimal( full_width = F )
 
 ```
 
