@@ -14,6 +14,11 @@ MOFAdata
 msigdbr  
 
 ### RGCCA
+RGCCA
+FactoMineR
+factoextra
+ggpubr
+corrplot
 
 ## Topic 2
 WGCNA  
