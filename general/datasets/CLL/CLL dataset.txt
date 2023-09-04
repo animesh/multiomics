@@ -5,4 +5,4 @@ https://bioconductor.org/packages/release/data/experiment/src/contrib/MOFAdata_1
 
 And then specify in rstudio the path of this tar.gz file.
 
-Once install, use data("CLL_data") to load the data and data("CLL_covariates") to load the covariates. 
+Covariates are available on the github pasge under the name "sample_metadata.txt". Once uploaded, do not forget to get if the samples in the metadata match the one in the CLL_data.
