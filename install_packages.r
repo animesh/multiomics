@@ -1,46 +1,35 @@
-
+#base####
 #https://github.com/sib-swiss/summer-school-multiomics-data-analysis-and-integration/blob/master/general/precourse.md
 #R >= 4 with Rstudio or another IDE
 install.packages(c("remotes","data.table","DT"))
 
-#Topic 1
-install.packages("BiocManager")
-BiocManager::install("MOFA2")
+#Topic 1####
+install.packages("BiocManager","ggplot2","RGCCA")
+BiocManager::install("MOFA2")s
 BiocManager::install("MOFA")
 BiocManager::install("MOFAdata")
 BiocManager::install("gage")
 BiocManager::install("msigdbr")
-install.packages(c("ggplot2","RGCCA"))
 
-#Topic 2
-WGCNA
-compositions
-pheatmap
-SNFtool
-igraph
-mixOmics
+#Topic 2####
+install.packages(c("WGCNA","compositions","pheatmap","SNFtool","igraph"))
+BiocManager::install("mixOmics")
+#Cytoscape ( version >= 3.7) with these applications :    - yFiles Layout Algorithm - LegendCreator
 
-Cytoscape (https://cytoscape.org/download.html, version >= 3.7) with these applications :
-- yFiles Layout Algorithm - LegendCreator
+#Topic 3####
+install.packages(c("tidyverse","neo4r","tidytext","dplyr","tidyr","readr","tidyr"))
+BiocManager::install("TCGAbiolinks")#(facultatif + via Bioconductor)
+BiocManager::install("SummarizedExperiment")
+BiocManager::install("clusterProfiler")
+BiocManager::install("enrichR")
+BiocManager::install("DOSE")
+BiocManager::install("AnnotationHub")
+BiocManager::install("GO.db")
+BiocManager::install("GOxploreR")
+BiocManager::install("annotate")
+BiocManager::install("visNetwork")
+BiocManager::install("diffuStats")
+BiocManager::install("visNetwork")
 
-Topic 3
-tidyverse
-TCGAbiolinks (facultatif + via Bioconductor)
-SummarizedExperiment (facultatif + via Bioconductor)
-clusterProfiler (via Bioconductor)
-enrichR
-DOSE (via Bioconductor)
-AnnotationHub (via Bioconductor)
-neo4r
-tidytext
-GO.db (via Bioconductor)
-GOxploreR
-annotate
-visNetwork
-dplyr
-tidyr
-readr
-visNetwork
-diffuStats
-
-library(ggplot2)
+#test####
+#library(ggplot2)
