@@ -1,14 +1,25 @@
 ---
-title: "Topic 3 - Enrichment analyses and contextualisation of results with Knowledge
-  Graphs"
+title: "Topic 3 - Enrichment analyses and contextualisation of results with Knowledge Graphs"
 author: "Maxime Delmas"
-date: "2023-08-02"
-output:
-  html_document: default
-  pdf_document: default
+date: "`r date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    number_sections: false
+    code_folding: show
+    highlight: pygments
+editor_options: 
+  chunk_output_type: console
 ---
 
+
 ```{r setup, include=FALSE}
+options(knitr.table.format="html")
+```
+
+```{r libraries_loading, warning=FALSE, message=FALSE, results='hide'}
 library(tidyverse)
 library(TCGAbiolinks)
 library(SummarizedExperiment)
@@ -24,21 +35,22 @@ library(DT)
 library(visNetwork)
 ```
 
-# Case study: Pan Cancer downstream analysis BRCA - TCGA-BRCA project
+# 1. Case study: Pan Cancer downstream analysis BRCA - TCGA-BRCA project
 
-* Data:
+## 1.1 Data:
   * 5 normal samples
   * 5 tumor samples
 
 The full pipeline analysis of the raw data can be found [here](https://master.bioconductor.org/packages/release/bioc/vignettes/TCGAbiolinks/inst/doc/analysis.html).
 More info on the original project [here](https://portal.gdc.cancer.gov/projects/TCGA-BRCA)
 
-# Accessing and processing the original raw data
+## 1.2 Accessing and processing the original raw data
 
 Raw data are first downloaded, pre-processsed, normalized and filtered. Then, the differential expression analysis is computed with the standard pipeline provided by the TCGAbiolinks package.
 
-Alternatively, one can directly load the final result table in the next chunck.
-```{r, include = FALSE}
+Alternatively, one can directly load the final result table in the next chunck
+.
+```{r, include = FALSE, eval = FALSE}
 
 listSamples <- c(
     "TCGA-E9-A1NG-11A-52R-A14M-07", "TCGA-BH-A1FC-11A-32R-A13Q-07",
@@ -109,10 +121,10 @@ filtered_dataDEGs <- dataDEGs[dataDEGs$gene_type == "protein_coding", ]
 write.table(filtered_dataDEGs, "../data/tcga_brca_dge.tsv", sep = "\t", col.names = T, row.names = F)
 ```
 
-## Loading and filtering differential analyses results
+## 1.3 Loading and filtering differential analysis results
 
 * Load the *data.rda* file containing the output of the differential expression analysis.
-* Extract universe as the list of gene labels
+* Extract the **Universe** as the list of gene labels.
 * Apply cutoffs on **fdr (aka q.value)** and **logFC** to select an initial list of significantly differentially expressed genes. We start by applying a standard $|LogFC| > 1$ and $q.value < 1e-2$.
 * Select the list of gene labels associated with this set
 
@@ -139,9 +151,9 @@ HS.annotation <- hub[["AH111575"]]
 ```
 
 
-## GO Over-Representation Analysis
+# 2. GO Over-Representation Analysis
 
-### Compute ORA on Biological Processes
+## 2.1 Compute ORA on Biological Processes
 
 Compute an ORA analysis on the previously extracted list of differentially expression genes and Gene Ontology.
 
@@ -151,7 +163,7 @@ See **?enrichGO** for details on the arguments.
 
 We use the list of significantly differentially expressed genes and the whole list of protein coding genes in the assay as *universe*. No contrain applied on the size of GO terms sets.
 
-Then, we plot.
+Then, we plot !
 
 ```{r}
 ego <- enrichGO(gene = DE.set,
@@ -162,12 +174,11 @@ ego <- enrichGO(gene = DE.set,
                 pAdjustMethod = "BH", 
                 minGSSize = 1,
                 maxGSSize = 100000)
-
 ```
 
 
 ```{r}
-DT::datatable(ego@result, options = list(pageLength = 50))
+DT::datatable(ego@result %>% dplyr::select(-geneID), options = list(pageLength = 20))
 ```
 
 
@@ -177,12 +188,52 @@ dotplot(ego, showCategory=20, font.size=25) +
   theme(legend.key.size = unit(2, 'cm'), legend.text = element_text(size=25), legend.title = element_text(size=25))
 ```
 
-### Vizualise ORA on the Gene Ontology DAG graph for a specific enriched GO term
+
+## 2.2 KEGG Over-Representation Analysis
+
+* Same as with GO, but with KEGG pathways.
+
+* Adapt the identifiers for KEGG: needs *ENTREZID* instead of gene *SYMBOLS*
+
+```{r, message = FALSE}
+# Mapping between Gene symbol and Entrez ID
+universe2 <- bitr(universe, fromType="SYMBOL", toType = "ENTREZID", OrgDb = HS.annotation)
+universe2 <- universe2$ENTREZID
+
+DE.set2 <- bitr(DE.set, fromType="SYMBOL", toType = "ENTREZID", OrgDb = HS.annotation)
+DE.set2 <- DE.set2$ENTREZID
+
+ekegg <- enrichKEGG(
+  gene = DE.set2,
+  organism = "hsa",
+  keyType = "ncbi-geneid",
+  pAdjustMethod = "BH",
+  universe = universe2,
+  use_internal_data = FALSE)
+```
+
+```{r}
+DT::datatable(ekegg@result %>% dplyr::select(-geneID), options = list(pageLength = 20))
+```
+
+```{r,  out.width="100%", fig.width = 16, fig.height = 12, message=FALSE}
+dotplot(ekegg, showCategory=20, font.size=25) +
+  theme(legend.key.size = unit(2, 'cm'), legend.text = element_text(size=25), legend.title = element_text(size=25))
+```
+
+
+## 2.3 Vizualise ORA on the Gene Ontology DAG graph for a specific enriched GO term
+
+### 2.3.1 Sub-region vizualition
+
+First, we are gonna define an *helper* functions in order to plot the hierarchical structure on the Gene Ontology in a dynamic vizualisation using [VizNetwork](https://datastorm-open.github.io/visNetwork/)
+
+* Source: https://www.kaggle.com/code/antoninadolgorukova/gene-ontology-explorer/notebook#GO-term-tracking-in-GO-GAD
 
 ```{r, include=FALSE}
 prep_parents_graph <- function(go.ids) {
     
-    #dublicate each row according to the number of parents
+    # dublicate each row according to the number of parents
     df <- data.frame(GO_id = go.ids)
     
     if(!"n_PARENTs" %in% colnames(df)) {
@@ -242,12 +293,9 @@ displaypal<-function(mypal)
 }
 ```
 
-* Source: https://www.kaggle.com/code/antoninadolgorukova/gene-ontology-explorer/notebook#GO-term-tracking-in-GO-GAD
-* See document for visNetwork [here](https://datastorm-open.github.io/visNetwork/)
+However, the whole graph is big, so let's focus first on a particular sub-region: the "nuclear division" GO-term (GO:0000280)
 
-* Focus on the "nuclear division" GO term- (GO:0000280)
-
-* The visualization of the DAG allows to appreciate the hierarchical relations between the enriched terms and identify the different levels of enrichment.
+The visualization of the DAG will allow you to appreciate the hierarchical relations between the enriched terms and identify the different levels of enrichment.
 
 ```{r}
 # Get ancestors and direct children
@@ -285,14 +333,14 @@ visSave(plot, "nuclear_division_dag_vizu.html")
 
 Visualize the graph on the exported html document: *nuclear_division_dag_vizu.html*
 
-### Vizualise all ORA on the Gene Ontology DAG graph
+### 2.3.2 Vizualise all significant ORA results (q.value $< 1e-2$) on the Gene Ontology DAG graph
 
-* Select only the GO terms enriched with a q.value $< 1e-2$ and the union of all their ancestors. 
+* Select only the GO terms enriched with a q.value $< 1e-2$ and the union of **all their ancestors**. 
 
 * Different regions of the DAG are enriched.
 
 ```{r}
-# Get only ancestors
+# Get ancestors
 selected_go_bp <- ego@result[ego@result$qvalue <= 1e-2, ]$ID
 all_ego_dag <- sapply(selected_go_bp, function(x) {GOBPANCESTOR[[x]]})
 all_ego_dag <- unique(c(selected_go_bp, unlist(all_ego_dag)))
@@ -325,44 +373,11 @@ visSave(plot, "ego_dag_vizu.html")
 
 Visualize the graph on the exported html document: *ego_dag_vizu.html*
 
-## KEGG Over-Representation Analysis
-
-* Same as with GO, but with KEGG pathways.
-
-* Adapt the identifiers for KEGG: needs *ENTREZID* instead of gene *SYMBOLS*
-
-```{r, message = FALSE}
-# Mapping between Gene symbol and Entrez ID
-universe2 <- bitr(universe, fromType="SYMBOL", toType = "ENTREZID", OrgDb = HS.annotation)
-universe2 <- universe2$ENTREZID
-
-DE.set2 <- bitr(DE.set, fromType="SYMBOL", toType = "ENTREZID", OrgDb = HS.annotation)
-DE.set2 <- DE.set2$ENTREZID
-
-ekegg <- enrichKEGG(
-  gene = DE.set2,
-  organism = "hsa",
-  keyType = "ncbi-geneid",
-  pAdjustMethod = "BH",
-  universe = universe2,
-  use_internal_data = FALSE)
-```
-
-```{r}
-DT::datatable(ekegg@result, options = list(pageLength = 50))
-```
-
-```{r,  out.width="100%", fig.width = 16, fig.height = 12, message=FALSE}
-dotplot(ekegg, showCategory=20, font.size=25) +
-  theme(legend.key.size = unit(2, 'cm'), legend.text = element_text(size=25), legend.title = element_text(size=25))
-```
-
-
-## Reproducting the ClusterProfiler analysis manually (Example "neurotransmitter transport" - GO:0006836)
+## 2.4 Reproducting the ClusterProfiler analysis manually (Example "neurotransmitter transport" - GO:0006836)
 
 Have a look at the GO-term “neurotransmitter transport” (GO:0006836)
 
-### With a right-tailed fisher exact test
+### 2.4.1 With a right-tailed fisher exact test
 
 To build the contingency table, we need:
 
@@ -393,7 +408,8 @@ GO.0006836 <- GO.0006836[GO.0006836 %in% manual_universe]
 intersection <- sum(manual_gene_set %in% GO.0006836)
 ```
 
-* Building the contingency table:
+**Building the contingency table:**
+
 ```{r}
 L_GO_set <- length(GO.0006836)
 L_DE_set <- length(manual_gene_set)
@@ -405,13 +421,13 @@ print(f.test$p.value)
 
 We retrieve the exact p-value as computed by *ClusterProfiler*.
 
-### With an Hypergeomtric test:
+### 2.4.2 With an Hypergeomtric test:
 
 ```{r}
 phyper(q = (intersection - 1), m = L_GO_set, n = L_universe - L_GO_set, k = L_DE_set, lower.tail = F)
 ```
 
-### With simulations
+### 2.4.3 With simulations
 
 To better grasp what do these probabilities mean, we are gonna randomly sample $k$ gene symbols from the universe, where $k$ is our gene set size, and estimate our frequently we observed at least as much gene that overlap with the set of the selected GO term (GO:0006836).
 
@@ -430,7 +446,8 @@ print(paste("Estinate: ", a / N_SAMPLES))
 
 We get a good estimate of the previously observed *p.values*.
 
-## Studying the impact of the universe (*background set*) on the enrichment results:
+
+## 2.5 Studying the impact of the universe (*background set*) on the enrichment results:
 
 * What if you don't use an assay-specific universe, but simply the whole transcriptome ?
 
@@ -472,7 +489,7 @@ print(paste("Number of enriched BP without assay-specific universe: ", nrow(ego.
 
 * The *p.value* is over-estimated.
 
-## Studying the impact of the cutoff choices or database choices on the enrichment results
+## 2.6 Studying the impact of the cutoff choices or database choices on the enrichment results
 
 There are two main other choices that can affect the enrichment results.
 
@@ -582,11 +599,13 @@ out %>% dplyr::select(ID, Description, pvalue, threshold, ontology) %>%
 
 Maybe there is an other method that can prevent from imposing a threshold ?
 
-## GSEA
+# 3 GSEA (Gene Set Enrichment Analysis) -  A Functional Scoring Class Method
 
--  We need a ranking metric: we choose the LogFC. But *p.value*, or a mixture of the both can also be used. 
+- We need a ranking metric: we choose the LogFC. But *p.value*, or a mixture of the both can also be used. 
 
 - We set no constrains on the GO terms gene set sizes.
+
+## 3.1 Compute a GSEA
 
 ```{r}
 # apply gsea (with gene set permutation)
@@ -604,7 +623,7 @@ res.gsea.go <- gseGO(geneList = gsea.input,
 ```
 
 ```{r}
-DT::datatable(res.gsea.go@result, options = list(pageLength = 50))
+DT::datatable(res.gsea.go@result, options = list(pageLength = 20))
 ```
 
 ```{r, out.width="100%", fig.width = 16, fig.height = 12, message=FALSE}
@@ -616,13 +635,13 @@ dotplot(res.gsea.go, font.size=20, showCategory=10, split=".sign", x="GeneRatio"
 
 - The *NES* scores (and also *ES*) allow to determine the direction of enrichment: **activated** or **supressed**.
 
-### Vizualise ORA on the Gene Ontology DAG graph for a specific enriched GO term:
+## 3.2 Vizualise ORA on the Gene Ontology DAG graph for a specific enriched GO term:
 
 - *monocarboxylic acid metabolic process* (GO:0032787) which is **suppressed**.
 
 - *neurotransmitter transport* (GO:0000280) which is **activated**.
 
-Visualize the GO-terms relationships around the two enriched GO terms .
+Visualize the GO-terms relationships around the two enriched GO terms.
 
 ```{r}
 # Get only ancestors
@@ -665,7 +684,7 @@ Visualize the graph on the exported html document: *gsea_dag_vizu.html*
 - Both Biological Process, but in distinct regions of the DAG.
 - Their enrichment is consistent with their ancestors/children.
 
-## Comparing ORA .vs. GSEA
+## 3.3 Comparing ORA .vs. GSEA
 
 Comparing significantly enriched GO terms by the both methods: $q.value \le 1e-3$. We are gonna vizualise the differences in terms of enrichment directly on the DAG graph.
 
@@ -711,9 +730,9 @@ While GSEA is much more sensible, there is a significant overlap between the bot
 
 The differences follow the hierarchy.
 
-# Extend contextualisation with Hetionet and Neo4J
+# 4 Extend contextualisation with Hetionet and Neo4J
 
-## Find the diseases associated to genes from Hetionet
+## 4.1 Find the diseases associated to genes from Hetionet
 ```{r}
 # build the request
 query.1 = paste0("MATCH (d:Disease)-[r2:ASSOCIATES_DaG]->(g:Gene) WHERE g.name IN [",
@@ -734,7 +753,7 @@ disease.table <- data.frame(disease.name = result.1$d.name$value)
 disease.table %>% group_by(disease.name) %>% summarise(n = n()) %>% arrange(desc(n)) %>% DT::datatable()
 ```
 
-## Drugs used to treat the diseases
+## 4.2 Drugs used to treat the diseases
 ```{r}
 query.2 = paste0("MATCH (c:Compound)-[r1:TREATS_CtD]->(d:Disease)-[r2:ASSOCIATES_DaG]->(g:Gene)  WHERE g.name IN [",
                  paste0("'", paste0(filtered_data$gene_name, collapse = "' ,'"), "'"),
@@ -753,7 +772,7 @@ drug.table %>% group_by(drug.name) %>% summarise(n = n()) %>% arrange(desc(n)) %
 
 To visualize the corresponding graph, go send the query and visualize the graph on the [Neo4J browzer](https://neo4j.het.io/browser). But before, replace the return part of the query with : "RETURN c, r1, d, r2, g"
 
-## Drugs that downregulates the genes that are up-regulated in some diseases context
+## 4.3 Drugs that downregulates the genes that are up-regulated in some diseases context
 
 ```{r, echo=FALSE}
 up.regualted <- filtered_data[filtered_data$logFC > 5, ]
@@ -769,7 +788,8 @@ d.table.1 <- data.frame(c.name = result.4.1$c.name$value, g.name = result.4.1$g.
 DT::datatable(d.table.1)
 ```
 
-# Drugs that downregulates -> genes (here upregulated) <- Disease up-regualtes gene - Only on breast cancer
+## 4.4 Drugs - that downregulates -> genes (here upregulated) <- Disease up-regualtes gene. But, only on breast cancer at first.
+
 ```{r}
 up.regualted <- filtered_data[filtered_data$logFC > 5, ]
 query.4.2 = paste0("MATCH (c:Compound)-[r1:DOWNREGULATES_CdG]->(g:Gene)<-[r2:UPREGULATES_DuG]-(d:Disease) WHERE g.name IN [", 
@@ -786,11 +806,11 @@ DT::datatable(d.table.2)
 
 See also the details on the relations.
 
-## Creating our own enrichment background set
+## 4.5  Creating our own enrichment background set
 
 What are the *PharmacologicClass* of drugs that targets the differentially expressed genes ?
 
-- Extract the information from Hetionet
+- Extract **all** the available information on the pharmacological class of drugs associated to genes from Hetionet.
 - Convert the data to a TERM2GENE and a TERM2NAME tables.
 
 ```{r}
@@ -816,15 +836,15 @@ dotplot(e.hetionet, showCategory=20, font.size=20) +
   theme(legend.key.size = unit(2, 'cm'), legend.text = element_text(size=25), legend.title = element_text(size=25))
 ```
 
-# Supplementary materials
+# 5 Supplementary materials
 
-## Enrichment with TCGA-WGCNA results
+## 5.1 Enrichment with TCGA-WGCNA results
 
 ```{r, message=FALSE}
 data.WGCNA <- read_csv("./WGCNA_genesInfo_log_mRNA.csv")
 ```
 
-# WGCNA GO- Enrichment analysis
+## 5.2 WGCNA GO- Enrichment analysis
 
 ```{r}
 
@@ -887,10 +907,9 @@ out %>% dplyr::select(ID, Description, qvalue, moduleColor) %>%
 
 ```
 
-
 - The enrichment is also module-specific
 
-### Vizualising the enrichment results on the DAG 
+## 5.3 Vizualising the enrichment results on the DAG 
 ```{r}
 modules.top.GO <- out %>% dplyr::select(ID, GeneRatio, BgRatio, qvalue, moduleColor) %>% 
   group_by(moduleColor) %>% 
@@ -930,9 +949,9 @@ visSave(plot, "WGCNA_dag_vizu.html")
 
 Visualize the graph on the exported html document: *WGCNA_dag_vizu.html*
 
--  The enrichment also clusterise on the DAG graph.
+- The enrichment also cluster on the DAG graph.
 
-### Requests Hetionet to get the relations between genes in a same module
+## 5.4 Requests Hetionet to get the relations between genes in a same module
 
 ```{r}
 query.module = paste0("MATCH (g:Gene)-[r]->(g2:Gene) WHERE g.name IN [", 
@@ -943,3 +962,78 @@ query.module = paste0("MATCH (g:Gene)-[r]->(g2:Gene) WHERE g.name IN [",
 ```
 
 - To visualize the corresponding graph, go send the query and visualize the graph on the [Neo4J browzer](https://neo4j.het.io/browser).
+
+
+## 5.5 A link prediction example (Adamic Adar's hypothesis)
+
+```{sql, eval=FALSE}
+MATCH (cov:Gene)<-[r1:ASSOCIATES_DaG]-(d:Disease), (g:Gene)<-[r2:REGULATES_GrG]-(cov)
+WHERE NOT (d)-[:ASSOCIATES_DaG]->(g) AND d.name = 'breast cancer' AND g.name = 'ADGRG1'
+RETURN cov, g, r1, r2, d
+```
+
+## 5.6 Hypothesis discovery - Raynaud's Disease
+
+In this requests, we extracted:
+
+* Compounds related to the Raynaud’s Disease (mesh:D011928)
+* MeSH descriptors significantly related to these compounds, by selecting those that are related to therapeutic
+actions: Cardiovascular Agents or Hematologic Agents.
+* We then retrieve other compounds related to these MeSH descriptors
+* We also specify that these new compounds must :
+  * be related to fish oils (mesh:D005395)
+  * belong to the chemical class of Fatty Acyls (chemont:0003909).
+  * not be already related to Raynaud’s Disease in our KG.
+
+Therefore, these Fatty Acyls compounds associated with fish oils are related to the same therapeutic effects
+(Cardiovascular Agents or Hematologic Agents) as some compounds used as treatment for Raynaud’s Disease.
+Here we retrieve for instance Eicosapentaenoic acid (EPA), which indeed have the same therapeutic effect (Platelet
+Aggregation Inhibitors) as PGE1 or PGI2 which are used to treat Raynaud's disease.
+
+See more in the reference [article](https://academic.oup.com/bioinformatics/article/37/21/3896/6363786).
+
+```{sql, eval=FALSE}
+DEFINE input:inference "schema-inference-rules"
+
+select distinct (strafter(STR(?other_compound),"http://rdf.ncbi.nlm.nih.gov/pubchem/compound/CID")
+as ?CID)
+from <https://forum.semantic-metabolomics.org/ClassyFire/direct-parent/2020>
+from <https://forum.semantic-metabolomics.org/EnrichmentAnalysis/CID_MESH/2021>
+from <https://forum.semantic-metabolomics.org/ChemOnt/2016-08-27>
+from <https://forum.semantic-metabolomics.org/MeSHRDF/2022-01-04>
+where
+{
+{
+select ?other_compound
+where
+{
+mesh:D011928 skos:related ?RD_c .
+?RD_c skos:related ?mesh_TU .
+?mesh_TU (meshv:treeNumber|meshv:treeNumber/meshv:parentTreeNumber+) ?tn .
+?mesh_selected meshv:treeNumber ?tn .
+VALUES ?mesh_selected { mesh:D002317 mesh:D006401 }
+?other_compound skos:related ?mesh_TU .
+?other_compound skos:related mesh:D005395 .
+?other_compound a chemont:0003909 .
+}
+}
+FILTER NOT EXISTS {?other_compound skos:related mesh:D011928}
+}
+```
+
+## 5.7 Identifiers mapping on wikidata
+```{sql, eval=FALSE}
+SELECT ?gene ?ensembl_geme_id ?entrez_id ?civic_id ?hgnc_id ?OMID_id ?mesh_id WHERE {  
+  ?gene wdt:P31 wd:Q7187 ;
+    	wdt:P703 wd:Q15978631 .
+ 
+  OPTIONAL { ?gene wdt:P594 ?ensembl_geme_id . }
+  OPTIONAL { ?gene wdt:P351 ?entrez_id . }
+  OPTIONAL { ?gene wdt:P11277 ?civic_id . }
+  OPTIONAL { ?gene wdt:P354 ?hgnc_id . }
+  OPTIONAL { ?gene wdt:P492 ?OMID_id . }
+  OPTIONAL { ?gene wdt:P486 ?mesh_id . }
+ 
+  }
+LIMIT 1000
+```
