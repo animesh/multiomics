@@ -1,36 +1,6 @@
----
-title: "Analysis of a cohort of Major Depressive Disorder (MDD) with RGCCA"
-author: "Jimmy Vandel & Arnaud Gloaguen"
-date: "`r date()`"
-bibliography: references.bib
-link-citations: true
-output: 
-  html_document:
-    toc: true
-    toc_float: true
-    toc_depth: 4
-    number_sections: false
-    code_folding: show
-    highlight: zenburn
-params:
-  work_dir: "~/IFB_SIB/TP/MDD_RGCCA/"
-editor_options: 
-  chunk_output_type: console
----
-
-```{r setup, include=FALSE}
-knitr::opts_knit$set(root.dir=params$work_dir)
-knitr::opts_chunk$set(echo = TRUE)
-options(knitr.table.format="html")
-setwd(params$work_dir)
-```
-
-# 1. Unsupervised One-block analysis with Principal Component Analysis (PCA) 
-
-## 1.1 Library installation/loading
+Unsupervised One-block analysis with Principal Component Analysis (PCA) 
 
 ```{r libraries_loading, warning=FALSE, message=FALSE, results='hide'}
-
 # Load libraries
 library(RGCCA)
 library(FactoMineR)
@@ -39,36 +9,23 @@ library(ggpubr)
 library(corrplot)
 ```
 
-
-## 1.2 Data Introduction
-
-**Slides 2 -> 5 of "RGCCA - Theory"**.
-
-## 1.3 Preliminary observation and manipulations
-
-Starts by doing a simple PCA on gene expression matrix.
+PCA on gene expression matrix.
 
 ```{r, fig.height=8, fig.width=10, warning=FALSE, message=FALSE}
-##############
-
-# Starts from here 
-data.train = readRDS(file = "data.train")
-DNAm_covariates = readRDS("pd_mdd_bin.RDS")
-Sex = as.factor(data.train$cli$Sex)
-levels(Sex) = c("Female", "Male")
-
-# PCA on mRNA with full data-set
-pca_results <- PCA(data.train$mRNA, scale.unit=TRUE, ncp=25, graph=F) 
-
-fviz_pca_ind(pca_results, axes = c(1,2))+ 
-  geom_point(aes(colour = Sex)) +
-  guides(colour = guide_legend(title = "color"))
-
+dataRNA = read.csv("salmon.merged.gene_counts_length_scaled.tsv",sep="\t",row.names=1)
+rownames(dataRNA) = paste0(dataRNA[,1],rownames(dataRNA))
+dataRNA[,1]=NULL
+Cell=substr(colnames(dataRNA), start = 1, stop = 4)
+Cell[19:30]=substr(Cell[19:30], start = 1, stop = 3)
+table(Cell)
+Cell = as.factor(Cell)
+levels(Cell)
+dataRNAt<-data.frame(t(log2(dataRNA+1)))
+anno<-data.frame(Cell)
+rownames(anno)<-rownames(dataRNAt)
+pca_results <- PCA(dataRNAt, scale.unit=TRUE, ncp=25, graph=F) 
+fviz_pca_ind(pca_results, axes = c(1,2))+ geom_point(aes(colour = anno$Cell)) +guides(colour = guide_legend(title = "color"))
 ```
-
-==> There is a strong "Sex" effect. Several methods exist in the literature to correct for Sex (or other batch) effects (ex: ComBat @Johnson2006)
-
-For the sake of simplicity, we will limit ourselves to the gender with the highest number of samples --> Females.
 
 ```{r, fig.height=12, fig.width=10, warning=FALSE, message=FALSE}
 # Function taken from CHAMP to help interpret factors
