@@ -1,1 +1,8 @@
 CLL is accessible via the R package MOFAdata
+
+If you have troubles installing it, download the packgage directly from the source forge with the link:
+https://bioconductor.org/packages/release/data/experiment/src/contrib/MOFAdata_1.16.1.tar.gz
+
+And then specify in rstudio the path of this tar.gz file.
+
+Covariates are available on the github pasge under the name "sample_metadata.txt". Once uploaded, do not forget to get if the samples in the metadata match the one in the CLL_data.
